@@ -23,11 +23,15 @@
       color-scheme: light;
       --accent: #1565c0;
       --accent-hover: #1976d2;
-      --bg: #f5f7fa;
-      --panel: #ffffff;
-      --border: #d9dee5;
-      --text: #24292f;
-      --muted: #6b7280;
+      /* 落ち着いた青系: 全体は淡いブルーグレー、ヘッダーは深い青。
+         コーディング部分 (CodeMirror) のみ白背景のまま */
+      --bg: #d9e4f0;
+      --panel: #e9f1f8;
+      --border: #b7c9dc;
+      --text: #1f2d3d;
+      --muted: #5a708a;
+      --header-bg: #2e4d71;
+      --header-border: #24405e;
     }
     * { box-sizing: border-box; }
     body {
@@ -37,27 +41,30 @@
     }
     header {
       display: flex; align-items: center; gap: .5rem;
-      padding: .5rem .75rem; background: var(--panel); border-bottom: 1px solid var(--border);
+      padding: .5rem .75rem; background: var(--header-bg); border-bottom: 1px solid var(--header-border);
       overflow-x: auto;
     }
-    header h1 { font-size: 1.15rem; margin: 0 .75rem 0 0; font-weight: 700; flex: none; color: var(--accent); }
+    header h1 { font-size: 1.15rem; margin: 0 .75rem 0 0; font-weight: 700; flex: none; color: #fff; }
     button {
       font: inherit; font-size: 1rem; padding: .45rem .9rem; border: 1px solid var(--border);
-      background: #fff; color: var(--text); border-radius: 6px; cursor: pointer;
+      background: #f7fafd; color: var(--text); border-radius: 6px; cursor: pointer;
       white-space: nowrap;
     }
-    header button { flex: none; }
+    header button {
+      flex: none;
+      background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff;
+    }
+    header button:hover:not(:disabled) { background: rgba(255,255,255,.24); }
     @media (max-width: 1200px) {
       header { gap: .35rem; padding: .5rem .5rem; }
       header h1 { font-size: 1rem; margin-right: .4rem; }
       header button { font-size: .9rem; padding: .35rem .6rem; }
-      #run .hint { display: none; }
     }
-    button:hover:not(:disabled) { background: #f0f4f8; }
+    button:hover:not(:disabled) { background: #e8f0f8; }
     button:disabled { opacity: .45; cursor: default; }
-    #run, .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    #run:hover:not(:disabled), .primary:hover:not(:disabled) { background: var(--accent-hover); }
-    #stop { color: #b3261e; }
+    #run, .primary { background: #1e88e5; border-color: #1e88e5; color: #fff; }
+    #run:hover:not(:disabled), .primary:hover:not(:disabled) { background: #2196f3; }
+    #stop { color: #ffc4bc; }
     #save { margin-left: 1.2rem; }     /* 実行系 と 保存系 の区切り */
     #sample { margin-left: 1.2rem; }   /* 保存系 と サンプル の区切り */
     /* ステータスは幅が足りない時に省略記号で縮み、横スクロールを防ぐ */
@@ -65,8 +72,9 @@
       margin-left: auto; font-size: .95rem; flex: 0 1 auto; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    #status.ok { color: #2e7d32; }
-    #status.warn { color: #b26a00; }
+    #status { color: #d7e3f0; }
+    #status.ok { color: #a5e8b0; }
+    #status.warn { color: #ffd88f; }
     #vibe {
       margin-left: .75rem;
       background: linear-gradient(135deg, #7c4dff, #e040fb); color: #fff;
@@ -75,9 +83,10 @@
     #vibe:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(135deg, #7c4dff, #e040fb); }
 
     /* 編集 / ページ 切り替えタブ */
-    #viewswitch { display: inline-flex; flex: none; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-left: 1.2rem; }
-    #viewswitch button { border: none; border-radius: 0; padding: .45rem .9rem; background: #fff; color: var(--muted); }
-    #viewswitch button.active { background: #e3f0fc; color: var(--accent); font-weight: 600; }
+    #viewswitch { display: inline-flex; flex: none; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; overflow: hidden; margin-left: 1.2rem; }
+    #viewswitch button { border: none; border-radius: 0; padding: .45rem .9rem; background: transparent; color: rgba(255,255,255,.75); }
+    #viewswitch button:hover:not(:disabled) { background: rgba(255,255,255,.15); }
+    #viewswitch button.active { background: #fff; color: var(--accent); font-weight: 600; }
 
     main {
       flex: 1; min-height: 0; display: grid;
@@ -94,7 +103,7 @@
     }
     #pagebar {
       display: flex; align-items: center; gap: .5rem; padding: .3rem .6rem;
-      background: #eef2f7; border-bottom: 1px solid var(--border);
+      background: #d9e5f2; border-bottom: 1px solid var(--border);
       font-size: .85rem; color: var(--muted);
     }
     #preview { flex: 1; width: 100%; border: none; background: #fff; }
@@ -106,7 +115,7 @@
     }
     #console {
       flex: 1; margin: 0; padding: .75rem 5rem .75rem .75rem; overflow: auto;
-      white-space: pre-wrap; background: #fbfcfe;
+      white-space: pre-wrap; background: #f4f8fc;
       font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
       font-size: 13.5px; line-height: 1.5;
     }
@@ -129,8 +138,8 @@
       background: var(--panel); color: var(--muted); border: none; border-bottom: 2px solid transparent;
       border-radius: 0; cursor: pointer;
     }
-    #tabs .tab:hover { background: #f0f4f8; }
-    #tabs .tab.active { color: var(--accent); background: #e3f0fc; border-bottom-color: var(--accent); font-weight: 600; }
+    #tabs .tab:hover { background: #dbe7f3; }
+    #tabs .tab.active { color: var(--accent); background: #cfe3f6; border-bottom-color: var(--accent); font-weight: 600; }
     #monitor-note {
       padding: .5rem .75rem; font-size: .85rem; color: #8a6d1a;
       background: #fff8e1; border-bottom: 1px solid #f0e3b2;
@@ -139,10 +148,10 @@
     #watchlist { overflow: auto; padding: .25rem 0; flex: 1; }
     .watch {
       display: grid; grid-template-columns: 1fr auto; align-items: center;
-      gap: .25rem .5rem; padding: .45rem .75rem; border-bottom: 1px solid #eef1f5;
+      gap: .25rem .5rem; padding: .45rem .75rem; border-bottom: 1px solid #d5e2ef;
     }
     .watch .name {
-      font-size: 14px; color: #444;
+      font-size: 14px; color: #33475e;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .watch .val {
@@ -155,7 +164,7 @@
     #refview[hidden], #watchlist[hidden] { display: none; }
     #refview .rnote { font-size: .85rem; color: var(--muted); margin: .4rem 0 .2rem; line-height: 1.5; }
     #refview h4 { margin: .9rem 0 .25rem; font-size: .9rem; color: var(--accent); }
-    #refview .ritem { padding: .35rem 0; border-bottom: 1px solid #eef1f5; }
+    #refview .ritem { padding: .35rem 0; border-bottom: 1px solid #d5e2ef; }
     #refview .rsig { display: block; font-family: ui-monospace, Menlo, monospace; font-size: .88rem; color: #6f42c1; }
     #refview .rdoc { font-size: .85rem; color: var(--muted); }
     .CodeMirror-hints { font-size: 14px; max-height: 22em; z-index: 60; }
@@ -180,7 +189,7 @@
       background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 6px;
     }
     .modal-actions { display: flex; justify-content: flex-end; gap: .5rem; padding: .75rem 1rem; border-top: 1px solid var(--border); }
-    .prog-row { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid #eef1f5; }
+    .prog-row { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid #d5e2ef; }
     .prog-row .pname { flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 1rem; word-break: break-all; }
     .prog-row button { font-size: .9rem; padding: .3rem .7rem; }
   </style>
@@ -189,7 +198,7 @@
   <header>
     <h1>AkaDako JavaScript</h1>
     <button id="connect" title="ボードに接続">Connect</button>
-    <button id="run" title="実行 (Ctrl+Enter)">Run ▶ <span class="hint">(Ctrl+Enter)</span></button>
+    <button id="run" title="実行 (Ctrl+Enter)">Run ▶</button>
     <button id="stop" disabled title="停止">Stop ◼</button>
     <span id="viewswitch">
       <button id="view-edit" class="active" title="編集画面">Edit</button>
