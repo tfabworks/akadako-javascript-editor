@@ -417,7 +417,8 @@ async function connectBoard() {
         log("ボードが切断されました\n", "err");
         board = null;
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-        connectBtn.textContent = "ボードに接続";
+        connectBtn.textContent = "Connect";
+        connectBtn.title = "ボードに接続";
       });
       log("接続しました\n", "muted");
     }
@@ -428,7 +429,8 @@ async function connectBoard() {
     const labels = availableKeys.map((k) => defByKey.get(k).label);
     log("センサー検出: " + (labels.join(", ") || "なし") + "\n", "muted");
     setStatus("接続済み", true);
-    connectBtn.textContent = "再スキャン";
+    connectBtn.textContent = "Rescan";
+    connectBtn.title = "センサーを再スキャン";
     setMonitorPaused(pageRunning);
     startPolling();
   } catch (e) {
@@ -507,14 +509,14 @@ function applySample() {
   currentName = "";
   const labels = availableKeys.map((k) => defByKey.get(k).label);
   log("サンプルを作成しました（センサー: " + labels.join(", ") + "）\n", "muted");
-  setStatus("サンプルを作成しました —「実行 ▶」で表示できます", true);
+  setStatus("サンプルを作成しました —「Run ▶」で表示できます", true);
   showView("edit");
 }
 
 function onSampleClick() {
   if (!board || !board.isConnected || !availableKeys.length) {
-    setStatus("先に「ボードに接続」してください", false);
-    log("「サンプル」はボードに接続してから使えます。\n", "err");
+    setStatus("先に「Connect」でボードに接続してください", false);
+    log("「Sample」はボードに接続してから使えます。\n", "err");
     return;
   }
   if (!editorPristine) {
@@ -804,4 +806,4 @@ tabRef.addEventListener("click", () => showTab("ref"));
   ]);
 })();
 
-log("準備完了。「ボードに接続」でセンサーをグラフ表示、「実行 ▶」でHTMLページを表示します。\n", "muted");
+log("準備完了。「Connect」でセンサーをグラフ表示、「Run ▶」でHTMLページを表示します。\n", "muted");

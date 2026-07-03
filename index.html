@@ -60,7 +60,11 @@
     #stop { color: #b3261e; }
     #save { margin-left: 1.2rem; }     /* 実行系 と 保存系 の区切り */
     #sample { margin-left: 1.2rem; }   /* 保存系 と サンプル の区切り */
-    #status { margin-left: auto; font-size: .95rem; flex: none; }
+    /* ステータスは幅が足りない時に省略記号で縮み、横スクロールを防ぐ */
+    #status {
+      margin-left: auto; font-size: .95rem; flex: 0 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     #status.ok { color: #2e7d32; }
     #status.warn { color: #b26a00; }
     #vibe {
@@ -184,18 +188,18 @@
 <body>
   <header>
     <h1>AkaDako JavaScript</h1>
-    <button id="connect">ボードに接続</button>
-    <button id="run">実行 ▶ <span class="hint">(Ctrl+Enter)</span></button>
-    <button id="stop" disabled>停止 ◼</button>
+    <button id="connect" title="ボードに接続">Connect</button>
+    <button id="run" title="実行 (Ctrl+Enter)">Run ▶ <span class="hint">(Ctrl+Enter)</span></button>
+    <button id="stop" disabled title="停止">Stop ◼</button>
     <span id="viewswitch">
-      <button id="view-edit" class="active">編集</button>
-      <button id="view-page">ページ</button>
+      <button id="view-edit" class="active" title="編集画面">Edit</button>
+      <button id="view-page" title="HTMLページ画面">Page</button>
     </span>
-    <button id="save">保存</button>
-    <button id="open">開く</button>
-    <button id="sample">サンプル</button>
+    <button id="save" title="保存">Save</button>
+    <button id="open" title="開く">Open</button>
+    <button id="sample" title="サンプル：接続中の全センサーの値を表示するHTMLを作成">Sample</button>
     <span id="status" class="warn">未接続</span>
-    <button id="vibe">バイブコーディング ✨</button>
+    <button id="vibe" title="バイブコーディング（準備中）">Vibe Coding ✨</button>
   </header>
   <main>
     <div id="editorwrap"><textarea id="editor" spellcheck="false"></textarea></div>
@@ -215,8 +219,8 @@
         <button id="tab-sensor" class="tab active">センサー</button>
         <button id="tab-ref" class="tab">リファレンス</button>
       </div>
-      <div id="monitor-note" hidden>ページ実行中は、ボードをページ側が使うためモニターを一時停止しています。「停止 ◼」で再開します。</div>
-      <div id="watchlist"><div class="empty">「ボードに接続」すると、接続されているセンサーを自動で探して、見つかったセンサーをすべてここにグラフ表示します。</div></div>
+      <div id="monitor-note" hidden>ページ実行中は、ボードをページ側が使うためモニターを一時停止しています。「Stop ◼」で再開します。</div>
+      <div id="watchlist"><div class="empty">「Connect」でボードに接続すると、接続されているセンサーを自動で探して、見つかったセンサーをすべてここにグラフ表示します。</div></div>
       <div id="refview" hidden></div>
     </aside>
   </main>
