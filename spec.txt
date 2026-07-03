@@ -1,0 +1,15 @@
+AkaDako用のJavaScript Editorを作ってください。
+
+- AkaDakoのJavaScriptの仕様については、https://github.com/tfabworks/akadako.js を参照願います。
+- Editorの画面は、https://github.com/tfabworks/akadako-python-editor を参考にしてください。ただし色味は、明るい感じにしてください。
+- JavaScriptの場合は、1つのHTMLページを作るイメージ（CSS,JavaScript含む）でお願いします。
+- 編集画面とHTMLページ画面の切り替えボタンがあり、実行ボタンをクリックすると、HTMLページ画面に切り替わります。
+- 右サイドのセンサーグラフ描画部分ですが、akadako-pyton-editorの作りとしては、pirnt文があるセンサーだけの表示となっておりますが、接続ボタンをクリックした瞬間に、接続されているセンサーを捜査し、見つかったセンサーを全てグラフ表示するようにしてください。
+- 「サンプル」ボタンをクリックすると、akadako-pyton-editor同様、接続されている全てのセンサーの値を表示するHTMLを作成してください。
+- HTMLページについては、AkaDakoの場合、WebMIDIを使います。もしiFrameを使う場合は、WebMIDIを許可してください。
+- akadako-pyton-editor同様、右側にJavaScriptの「リファレンス」を表示してください。
+- 将来的にはバイブコーディングが出来るようにしたいと思っています。「バイブコーディング」ボタンを上部ボタン一覧の一番右に追加してください。そして、ボタンをクリックしたら「準備中」というダイアログを表示してください。
+
+
+
+
