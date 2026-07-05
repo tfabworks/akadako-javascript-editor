@@ -751,7 +751,9 @@ async function callGenerativeAI(promptText) {
   return res.json(); // { content: string|null, error?: string|object }
 }
 
-function openVibeDialog() {
+// prefill を渡すと入力欄に復元する（エラー後の「入力に戻る」でのみ使用）。
+// 通常のボタンからの起動は空欄で開き、前回のプロンプトは表示しない。
+function openVibeDialog(prefill) {
   const wrap = document.createElement("div");
 
   // モード切り替え（今のコードを修正 / ゼロから作る）。
@@ -769,7 +771,7 @@ function openVibeDialog() {
   label.style.marginBottom = ".4rem";
   const ta = document.createElement("textarea");
   ta.rows = 5;
-  ta.value = lastVibePrompt;
+  ta.value = typeof prefill === "string" ? prefill : "";   // 通常は空欄で開く
   const hint = document.createElement("div");
   hint.style.cssText = "font-size:.85rem;color:var(--muted);margin-top:.5rem;line-height:1.6;";
 
@@ -852,7 +854,8 @@ function showVibeError(html, text) {
   if (html) node.innerHTML = html;          // 699.jp のエラー（アクセスコード案内リンク等）
   else node.textContent = text || "生成に失敗しました。";
   showModal("バイブコーディング ✨", node, [
-    { label: "入力に戻る", primary: true, onClick: openVibeDialog },
+    // エラー時だけは、打ち直さずに済むよう直前の入力を復元する
+    { label: "入力に戻る", primary: true, onClick: () => openVibeDialog(lastVibePrompt) },
     { label: "閉じる", onClick: closeModal },
   ]);
 }
@@ -881,7 +884,7 @@ function applyVibeResult(code, mode) {
   put();
 }
 
-$("vibe").addEventListener("click", openVibeDialog);
+$("vibe").addEventListener("click", () => openVibeDialog());   // 空欄で開く（前回のプロンプトは表示しない）
 
 // --- 右パネルのタブ（センサー / リファレンス） -------------------------------------
 const refview = $("refview");
