@@ -55,10 +55,18 @@
       background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff;
     }
     header button:hover:not(:disabled) { background: rgba(255,255,255,.24); }
-    @media (max-width: 1200px) {
+    @media (max-width: 1400px) {
       header { gap: .35rem; padding: .5rem .5rem; }
       header h1 { font-size: 1rem; margin-right: .4rem; }
       header button { font-size: .9rem; padding: .35rem .6rem; }
+    }
+    /* 履歴の ◀ ▶ は細身にしてヘッダーの幅を節約する */
+    #hist-back, #hist-fwd { padding-left: .55rem; padding-right: .55rem; }
+    /* さらに狭い画面ではタイトルを隠してボタンを優先する */
+    @media (max-width: 1100px) {
+      header h1 { display: none; }
+      header button { font-size: .85rem; padding: .3rem .5rem; }
+      #save, #sample { margin-left: .6rem; }
     }
     button:hover:not(:disabled) { background: #e8f0f8; }
     button:disabled { opacity: .45; cursor: default; }
@@ -121,6 +129,11 @@
     }
     #console .err { color: #c62828; }
     #console .muted { color: #2e7d32; }
+    /* 行番号つきエラーはクリックでエディタの該当行へ飛べる */
+    #console .jump { cursor: pointer; text-decoration: underline dotted; }
+    #console .jump:hover { background: #fdecec; }
+    /* エラーが起きた行の印 */
+    .CodeMirror .error-line { background: #ffe9e9; }
     #clear {
       position: absolute; top: .4rem; right: .6rem; z-index: 5;
       font-size: .85rem; padding: .25rem .6rem; opacity: .9;
@@ -227,6 +240,20 @@
     .prog-row { display: flex; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid #d5e2ef; }
     .prog-row .pname { flex: 1; font-family: ui-monospace, Menlo, monospace; font-size: 1rem; word-break: break-all; }
     .prog-row button { font-size: .9rem; padding: .3rem .7rem; }
+    /* 置き換え直後の「元に戻す」トースト */
+    #toast {
+      position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%);
+      display: flex; align-items: center; gap: .8rem; z-index: 60;
+      background: #1e3a5f; color: #fff; padding: .55rem .6rem .55rem 1rem;
+      border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+      font-size: .95rem; max-width: 90vw;
+    }
+    #toast[hidden] { display: none; }
+    #toast button {
+      font: inherit; font-size: .9rem; padding: .3rem .8rem; cursor: pointer;
+      background: #fff; color: var(--accent); border: none; border-radius: 6px;
+    }
+    #toast button:hover { background: #eef3f9; }
   </style>
 </head>
 <body>
@@ -239,8 +266,11 @@
       <button id="view-edit" class="active" title="編集画面">Edit</button>
       <button id="view-page" title="HTMLページ画面">Page</button>
     </span>
+    <button id="hist-back" disabled title="1つ前のコードに戻る（実行や生成のたびに自動で記録されます）">◀</button>
+    <button id="hist-fwd" disabled title="1つ先のコードに進む">▶</button>
     <button id="save" title="保存">Save</button>
     <button id="open" title="開く">Open</button>
+    <button id="download" title="今のコードをHTMLファイルとしてダウンロード（そのままブラウザで開ける作品ファイルになります）">Download</button>
     <button id="sample" title="サンプル：接続中の全センサーの値を表示するHTMLを作成">Sample</button>
     <span id="status" class="warn">未接続</span>
     <button id="vibe" title="Vibe Coding &amp; Assist：生成AIでプログラムを作成・エラーやコードの相談">Vibe/Assist ✨</button>
@@ -275,6 +305,12 @@
       <div id="modal-actions" class="modal-actions"></div>
     </div>
   </div>
+  <div id="toast" hidden>
+    <span id="toast-msg"></span>
+    <button id="toast-btn"></button>
+  </div>
+  <input type="file" id="filein" accept=".html,.htm" hidden>
+
   <script src="akadako.js"></script>
   <script src="akadako-api.js"></script>
   <script src="main.js"></script>

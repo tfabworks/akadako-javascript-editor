@@ -91,6 +91,8 @@ cm.setValue(STARTER_CODE);
 let editorPristine = true;
 let draftTimer = null;
 cm.on("change", (_cmi, change) => {
+  clearErrorLine();      // コードが変わったら行番号はズレるので、エラー行の印を消す
+  updateHistButtons();   // 履歴表示中に編集したら「進む」は使えなくなる等の反映
   if (change.origin !== "setValue") {
     editorPristine = false;
     clearTimeout(draftTimer);
@@ -219,10 +221,10 @@ viewPageBtn.addEventListener("click", () => showView("page"));
 // ユーザーの HTML の先頭 (head) に差し込む。
 const CONSOLE_BRIDGE = '<script>(function(){' +
   'function fmt(a){if(typeof a==="object"&&a!==null){try{return JSON.stringify(a);}catch(e){return String(a);}}return String(a);}' +
-  'function send(kind,text){try{parent.postMessage({__adkConsole:true,kind:kind,text:text},"*");}catch(e){}}' +
+  'function send(kind,text,line){try{parent.postMessage({__adkConsole:true,kind:kind,text:text,line:line||0},"*");}catch(e){}}' +
   '["log","info","warn","error"].forEach(function(k){var o=console[k]?console[k].bind(console):function(){};' +
   'console[k]=function(){var a=[].slice.call(arguments);send(k,a.map(fmt).join(" "));o.apply(null,a);};});' +
-  'window.addEventListener("error",function(e){send("error",String(e.message||e.error)+(e.lineno?" (行 "+e.lineno+")":""));});' +
+  'window.addEventListener("error",function(e){send("error",String(e.message||e.error)+(e.lineno?" (行 "+e.lineno+")":""),e.lineno);});' +
   'window.addEventListener("unhandledrejection",function(e){send("error","Promiseエラー: "+fmt(e.reason));});' +
   '})();<\/script>';
 
@@ -249,23 +251,65 @@ function recordPageError(text) {
   if (!askAiOffered) { askAiOffered = true; offerErrorConsult(); }
 }
 
+// エラーが起きた行に印をつける（ブリッジは <head> と同じ行に差し込むので、
+// iframe 内の行番号はエディタの行番号とそのまま一致する）。
+let errorLineHandle = null;
+function markErrorLine(line) {
+  clearErrorLine();
+  if (!line || line < 1 || line > cm.lineCount()) return;
+  errorLineHandle = cm.addLineClass(line - 1, "background", "error-line");
+}
+function clearErrorLine() {
+  if (errorLineHandle !== null) {
+    cm.removeLineClass(errorLineHandle, "background", "error-line");
+    errorLineHandle = null;
+  }
+}
+function jumpToLine(line) {
+  const ln = Math.min(line, cm.lineCount());
+  showView("edit");
+  markErrorLine(ln);
+  cm.setCursor({ line: ln - 1, ch: 0 });
+  cm.scrollIntoView({ line: ln - 1, ch: 0 }, 80);
+  cm.focus();
+}
+
+// ページのエラーをコンソール欄へ。行番号つきならクリックで該当行へ飛べるようにする。
+function logPageError(text, line) {
+  const span = document.createElement("span");
+  span.className = "err" + (line ? " jump" : "");
+  span.textContent = "[ページ] " + text + "\n";
+  if (line) {
+    span.title = "クリックで " + line + " 行目へ";
+    span.addEventListener("click", () => jumpToLine(line));
+    markErrorLine(line);
+  }
+  consoleEl.appendChild(span);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
 window.addEventListener("message", (e) => {
   const m = e.data;
   if (!m || !m.__adkConsole) return;
-  const cls = m.kind === "error" || m.kind === "warn" ? "err" : undefined;
-  log("[ページ] " + m.text + "\n", cls);
-  if (m.kind === "error") recordPageError(m.text);
-  else if (pageRunning) pageOutput = (pageOutput + m.text + "\n").slice(-3000);
+  if (m.kind === "error") {
+    logPageError(m.text, m.line);
+    recordPageError(m.text);
+  } else {
+    log("[ページ] " + m.text + "\n", m.kind === "warn" ? "err" : undefined);
+    if (pageRunning) pageOutput = (pageOutput + m.text + "\n").slice(-3000);
+  }
 });
 
 let pageRunning = false;
 
 function runCode() {
+  pushHistory(cm.getValue());   // 実行するコードを履歴に記録（◀で戻れる）
   // ページ側がボードを使うので、エディタのモニターは一時停止する
   setMonitorPaused(true);
   pageErrors = [];   // 新しい実行のエラーだけを集める
   pageOutput = "";
   askAiOffered = false;
+  clearErrorLine();
   preview.srcdoc = injectConsoleBridge(cm.getValue());
   pageRunning = true;
   stopBtn.disabled = false;
@@ -524,6 +568,7 @@ reads + '\n' +
 }
 
 function applySample() {
+  pushHistory(cm.getValue());   // 置き換え前のコードを履歴に記録（元に戻すで戻れる）
   cm.setValue(generateSampleHTML(availableKeys));
   editorPristine = true;   // 生成直後は未編集あつかい
   currentName = "";
@@ -531,6 +576,7 @@ function applySample() {
   log("サンプルを作成しました（センサー: " + labels.join(", ") + "）\n", "muted");
   setStatus("サンプルを作成しました —「Run ▶」で表示できます", true);
   showView("edit");
+  offerUndoToast("サンプルに置き換えました");
 }
 
 function onSampleClick() {
@@ -614,6 +660,118 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modal.hidden) closeModal();
 });
 
+// --- トーストと「元に戻す」 -----------------------------------------------------
+// 生成やサンプルでコードを置き換えた直後に、置き換え前へ戻せる安全網。
+// スナップショットは1つだけ持ち、次の置き換えで上書きされる。
+const toastEl = $("toast");
+const toastMsg = $("toast-msg");
+const toastBtn = $("toast-btn");
+let toastTimer = null;
+let toastAction = null;
+
+function showToast(message, btnLabel, onAction, ms) {
+  toastMsg.textContent = message;
+  toastBtn.textContent = btnLabel;
+  toastAction = onAction;
+  toastEl.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, ms || 10000);
+}
+function hideToast() {
+  toastEl.hidden = true;
+  toastAction = null;
+  clearTimeout(toastTimer);
+}
+toastBtn.addEventListener("click", () => {
+  const f = toastAction;
+  hideToast();
+  if (f) f();
+});
+
+function offerUndoToast(message) {
+  showToast(message, "元に戻す ↩", () => {
+    histBack();
+    setStatus("置き換える前のコードに戻しました", true);
+  });
+}
+
+// --- コードの履歴 ---------------------------------------------------------------
+// 実行・生成・置き換えのたびにコードを自動記録し、◀ ▶ で行き来できるタイムライン。
+// undo スタックではなく追記専用: 過去に戻ってから編集・実行しても、先の履歴は消えず
+// 新しい版として末尾に足される。トーストの「元に戻す」もこの履歴の「1つ戻る」。
+const HIST_KEY = "akadako_js_history";
+const HIST_MAX = 20;
+const histBackBtn = $("hist-back");
+const histFwdBtn = $("hist-fwd");
+let histList = [];
+try {
+  const h = JSON.parse(localStorage.getItem(HIST_KEY) || "[]");
+  if (Array.isArray(h)) histList = h.filter((e) => e && typeof e.code === "string");
+} catch {}
+let histPos = histList.length;   // histList.length は「最新（記録されていない編集中）」を表す
+
+function saveHistory() {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(histList)); }
+  catch {
+    // 容量オーバー時は古い半分を捨てて再試行（それでも失敗したらメモリ内だけで続行）
+    histList.splice(0, Math.ceil(histList.length / 2));
+    histPos = Math.min(histPos, histList.length);
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(histList)); } catch {}
+  }
+}
+
+// 末尾に記録して、その位置を返す（直前の記録と同じ内容なら記録せず同じ位置を返す）
+function pushHistory(code) {
+  const last = histList[histList.length - 1];
+  if (!last || last.code !== code) {
+    histList.push({ code, ts: Date.now() });
+    if (histList.length > HIST_MAX) histList.shift();
+    saveHistory();
+  }
+  histPos = histList.length;   // 記録したら「最新」に戻る
+  updateHistButtons();
+  return histList.length - 1;
+}
+
+// 今のエディタ内容が履歴のどこかを表示中ならその位置、未記録の編集中なら -1
+function currentHistIndex() {
+  if (histPos < histList.length && histList[histPos].code === cm.getValue()) return histPos;
+  return -1;
+}
+
+function applyHistoryAt(i) {
+  histPos = i;
+  cm.setValue(histList[i].code);
+  editorPristine = false;   // 復元した内容をサンプル等で黙って置き換えない
+  saveDraft();
+  showView("edit");
+  updateHistButtons();
+  setStatus("履歴 " + (i + 1) + "/" + histList.length + " のコードを表示中（編集や実行でここから続きを作れます）", true);
+}
+
+function histBack() {
+  let i = currentHistIndex();
+  // 実行していない編集中でも、まず記録してから戻る（▶でこの編集に戻って来られる）
+  if (i === -1) i = pushHistory(cm.getValue());
+  if (i <= 0) { updateHistButtons(); return; }
+  applyHistoryAt(i - 1);
+}
+
+function histForward() {
+  const i = currentHistIndex();
+  if (i === -1 || i >= histList.length - 1) return;
+  applyHistoryAt(i + 1);
+}
+
+function updateHistButtons() {
+  const i = currentHistIndex();
+  histBackBtn.disabled = histList.length === 0 || i === 0;
+  histFwdBtn.disabled = i === -1 || i >= histList.length - 1;
+}
+histBackBtn.addEventListener("click", histBack);
+histFwdBtn.addEventListener("click", histForward);
+updateHistButtons();
+
 function openSaveDialog() {
   const wrap = document.createElement("div");
   const label = document.createElement("div");
@@ -650,7 +808,10 @@ function openOpenDialog() {
   const list = document.createElement("div");
   if (!names.length) {
     list.textContent = "保存されたプログラムはありません。";
-    showModal("開く", list, [{ label: "閉じる", onClick: closeModal }]);
+    showModal("開く", list, [
+      { label: "ファイルから開く…", onClick: () => fileInput.click() },
+      { label: "閉じる", onClick: closeModal },
+    ]);
     return;
   }
   for (const name of names) {
@@ -664,6 +825,7 @@ function openOpenDialog() {
     openB.addEventListener("click", () => {
       const code = loadStore()[name];
       if (code === undefined) return;
+      pushHistory(cm.getValue());   // 開く前のコードを履歴に記録
       cm.setValue(code);
       currentName = name;
       editorPristine = false;
@@ -677,7 +839,10 @@ function openOpenDialog() {
     row.append(nm, openB, delB);
     list.append(row);
   }
-  showModal("開く", list, [{ label: "閉じる", onClick: closeModal }]);
+  showModal("開く", list, [
+    { label: "ファイルから開く…", onClick: () => fileInput.click() },
+    { label: "閉じる", onClick: closeModal },
+  ]);
 }
 
 function confirmDelete(name) {
@@ -696,6 +861,53 @@ function confirmDelete(name) {
 
 $("save").addEventListener("click", openSaveDialog);
 $("open").addEventListener("click", openOpenDialog);
+
+// --- ダウンロード / ファイルから開く -----------------------------------------------
+// 作品は1つの完結したHTMLなので、ダウンロードすればそのままブラウザで開ける。
+// 単体で開いてもボードが動くよう、akadako.js の参照は絶対URLに書き換えて出力する。
+const AKADAKO_JS_URL = "https://js.699.jp/akadako.js";
+
+function downloadHTML() {
+  const code = cm.getValue().replace(
+    /src=(["'])(?:\.\/)?akadako\.js\1/g,
+    "src=$1" + AKADAKO_JS_URL + "$1"
+  );
+  const title = (cm.getValue().match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+  const base = (currentName || title || "akadako-page").trim().replace(/[\\/:*?"<>|]/g, "_") || "akadako-page";
+  const blob = new Blob([code], { type: "text/html" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = base + ".html";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  setStatus("ダウンロードしました: " + a.download, true);
+}
+$("download").addEventListener("click", downloadHTML);
+
+// 「開く」ダイアログの「ファイルから開く…」で使う（ダウンロードした作品の読み込み）
+const fileInput = $("filein");
+fileInput.addEventListener("change", () => {
+  const f = fileInput.files && fileInput.files[0];
+  fileInput.value = "";   // 同じファイルをもう一度選べるように
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    // ダウンロード時に絶対URLへ書き換えた akadako.js の参照を相対に戻す
+    const code = String(reader.result).replace(
+      new RegExp('src=(["\'])' + AKADAKO_JS_URL.replace(/\./g, "\\.") + '\\1', "g"),
+      "src=$1akadako.js$1"
+    );
+    pushHistory(cm.getValue());   // 読み込む前のコードを履歴に記録
+    cm.setValue(code);
+    currentName = f.name.replace(/\.html?$/i, "");
+    editorPristine = false;
+    saveDraft();
+    closeModal();
+    showView("edit");
+    setStatus("ファイルを読み込みました: " + f.name, true);
+  };
+  reader.readAsText(f);
+});
 
 // --- バイブコーディング（生成AIでHTMLページを作る） ---------------------------------
 // xcx-g2s の「生成AI」ブロックと同じエンドポイントを使う。
@@ -1052,12 +1264,14 @@ function showVibeError(html, text, mode) {
 // - new: 未保存の編集があるときだけ置き換え確認する（サンプルと同じ作法）。
 function applyVibeResult(code, mode) {
   const put = () => {
+    pushHistory(cm.getValue());   // 置き換え前のコードを履歴に記録（元に戻すで戻れる）
     cm.setValue(code);
     editorPristine = true;   // 生成直後は未編集あつかい
     currentName = "";
     setStatus("バイブコーディングでコードを生成しました", true);
     log("バイブコーディングでコードを生成しました。\n", "muted");
     runCode();               // 生成が完成したら自動で実行し、Pageモードに切り替える
+    offerUndoToast("生成したコードに置き換えました");
   };
   if (mode === "new" && !editorPristine) {
     const msg = document.createElement("div");
