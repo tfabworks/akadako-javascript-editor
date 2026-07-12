@@ -97,10 +97,21 @@
     #viewswitch button.active { background: #fff; color: var(--accent); font-weight: 600; }
 
     main {
+      /* スプリッターのドラッグで JS がこの2変数を書き換える（初期値は画面の1/4相当） */
+      --monitor-w: 25vw;
+      --console-h: 25vh;
       flex: 1; min-height: 0; display: grid;
-      grid-template-columns: 1fr 360px;
-      grid-template-rows: 1fr 200px;
+      grid-template-columns: minmax(240px, 1fr) 6px var(--monitor-w);
+      grid-template-rows: minmax(80px, 1fr) 6px var(--console-h);
     }
+    /* パネル境界のドラッグつまみ */
+    .splitter { background: var(--border); flex: none; touch-action: none; }
+    .splitter:hover, .splitter.dragging { background: var(--accent); }
+    #split-v { grid-column: 2; grid-row: 1 / span 3; cursor: col-resize; }
+    #split-h { grid-column: 1; grid-row: 2; cursor: row-resize; }
+    /* ドラッグ中は iframe がマウスイベントを奪わないようにし、文字選択も防ぐ */
+    body.splitting { user-select: none; -webkit-user-select: none; }
+    body.splitting iframe { pointer-events: none; }
     #editorwrap { grid-column: 1; grid-row: 1; overflow: hidden; min-height: 0; background: #fff; }
     .CodeMirror { height: 100%; font-size: 15px; line-height: 1.55; }
 
@@ -118,8 +129,8 @@
     #pagewrap[hidden], #editorwrap[hidden] { display: none; }
 
     #console-wrap {
-      grid-column: 1; grid-row: 2; position: relative; min-height: 0;
-      display: flex; border-top: 1px solid var(--border);
+      grid-column: 1; grid-row: 3; position: relative; min-height: 0;
+      display: flex;
     }
     #console {
       flex: 1; margin: 0; padding: .75rem 5rem .75rem .75rem; overflow: auto;
@@ -141,9 +152,9 @@
 
     /* 右パネル: センサーグラフ / リファレンス */
     aside#monitor {
-      grid-column: 2; grid-row: 1 / span 2; min-height: 0;
+      grid-column: 3; grid-row: 1 / span 3; min-height: 0;
       display: flex; flex-direction: column;
-      background: var(--panel); border-left: 1px solid var(--border);
+      background: var(--panel);
     }
     #tabs { display: flex; border-bottom: 1px solid var(--border); }
     #tabs .tab {
@@ -284,10 +295,12 @@
       <!-- AkaDako は WebMIDI を使うため、iframe に midi を許可する -->
       <iframe id="preview" allow="midi *" title="HTMLページ"></iframe>
     </div>
+    <div id="split-h" class="splitter" title="ドラッグでコンソールの高さを変更（ダブルクリックで元に戻す）"></div>
     <div id="console-wrap">
       <button id="clear">クリア</button>
       <pre id="console"></pre>
     </div>
+    <div id="split-v" class="splitter" title="ドラッグで右パネルの幅を変更（ダブルクリックで元に戻す）"></div>
     <aside id="monitor">
       <div id="tabs">
         <button id="tab-sensor" class="tab active">センサー</button>

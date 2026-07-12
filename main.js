@@ -1418,4 +1418,64 @@ tabRef.addEventListener("click", () => showTab("ref"));
   ]);
 })();
 
+// --- パネルのリサイズ (スプリッターのドラッグ) --------------------------------------
+(function setupSplitters() {
+  const mainEl = document.querySelector("main");
+  const LAYOUT_KEY = "akadako-js-editor.layout";
+  // 初回（保存なし）は右パネル=画面幅の1/4、コンソール=作業領域高さの1/4
+  const defaults = () => ({
+    monitorW: Math.round(window.innerWidth / 4),
+    consoleH: Math.round(mainEl.clientHeight / 4),
+  });
+  const layout = defaults();
+  try { Object.assign(layout, JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}")); } catch {}
+
+  function clamp() {
+    // 最小サイズを確保しつつ、ウィンドウより大きくならないようにする
+    layout.monitorW = Math.min(Math.max(layout.monitorW, 220), Math.max(220, window.innerWidth - 320));
+    layout.consoleH = Math.min(Math.max(layout.consoleH, 48), Math.max(48, mainEl.clientHeight - 120));
+  }
+  function apply() {
+    clamp();
+    mainEl.style.setProperty("--monitor-w", layout.monitorW + "px");
+    mainEl.style.setProperty("--console-h", layout.consoleH + "px");
+  }
+  function save() {
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch {}
+  }
+
+  function makeDraggable(el, getValueFromPointer, key) {
+    // 注意: ここで preventDefault すると互換マウスイベントが消えて dblclick が発火しなくなる
+    el.addEventListener("pointerdown", (e) => {
+      el.setPointerCapture(e.pointerId);
+      el.classList.add("dragging");
+      document.body.classList.add("splitting");
+      const onMove = (ev) => {
+        layout[key] = getValueFromPointer(ev);
+        apply();
+      };
+      const onUp = () => {
+        el.removeEventListener("pointermove", onMove);
+        el.classList.remove("dragging");
+        document.body.classList.remove("splitting");
+        save();
+        cm.refresh();
+      };
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp, { once: true });
+      el.addEventListener("pointercancel", onUp, { once: true });
+    });
+    el.addEventListener("dblclick", () => {
+      layout[key] = defaults()[key];
+      apply(); save(); cm.refresh();
+    });
+  }
+
+  makeDraggable($("split-v"), (ev) => Math.round(mainEl.getBoundingClientRect().right - ev.clientX), "monitorW");
+  makeDraggable($("split-h"), (ev) => Math.round(mainEl.getBoundingClientRect().bottom - ev.clientY), "consoleH");
+
+  window.addEventListener("resize", apply);
+  apply();
+})();
+
 log("準備完了。「Connect」でセンサーをグラフ表示、「Run ▶」でHTMLページを表示します。\n", "muted");
